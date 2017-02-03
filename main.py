@@ -30,9 +30,12 @@ from google.appengine.ext import db
 secret = 'D98SwsNVCbL6ZT?'
 
 messages = \
-    {'wb': "Welcome back! Be sure to comment on my posts if you have anything to say! I'd love to hear from you!",
+    {'wb': "Welcome back! Be sure to comment on my posts"
+     "if you have anything to say! I'd love to hear from you!",
      'cbs': 'Come back soon!', 'wl': 'Welcome to the community!'}
-actions = {'li': 'logged in', 'lo': 'logged out', 'su': 'registering'}
+actions = {'li': 'logged in',
+           'lo': 'logged out',
+           'su': 'registering'}
 
 template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 jinja_env = \
@@ -125,8 +128,10 @@ class BlogHandler(webapp2.RequestHandler):
 
     def make_cookie(self, name, val):
         cookie = make_secure(val)
-        self.response.headers.add_header('Set-Cookie',
-                '{}={}; Path=/'.format(name, cookie))
+        self.response.headers.add_header(
+            'Set-Cookie',
+            '{}={}; Path=/'.format(name, cookie)
+        )
 
     def read_cookie(self, name):
         cookie = self.request.cookies.get(name)
@@ -145,8 +150,9 @@ class BlogHandler(webapp2.RequestHandler):
         self.make_cookie('user-id', str(user.key().id()))
 
     def logout(self):
-        self.response.headers.add_header('Set-Cookie',
-                'user-id=; Path=/')
+        self.response.headers.add_header(
+            'Set-Cookie',
+            'user-id=; Path=/')
 
 
 # ---------------------/
@@ -182,11 +188,10 @@ class Comment(db.Model):
 
     def render(self, user):
         self._render_text()
-        return render_str('comment.html', comment=self)
+        return render_str('comment.html', user=user, comment=self)
 
 
 class User(db.Model):
-
     name = db.StringProperty(required=True)
     pw_hash = db.StringProperty(required=True)
     email = db.StringProperty()
@@ -231,13 +236,7 @@ class User(db.Model):
     # Returns User class to register with
 
     @classmethod
-    def register(
-        cls,
-        name,
-        pw,
-        email=None,
-        ):
-
+    def register(cls, name, pw, email=None):
         pw_hash = make_pw_hash(name, pw)
         return User(parent=users_key(), name=name, pw_hash=pw_hash,
                     email=email, exist_key=name.lower())
@@ -286,14 +285,15 @@ class PostPage(BlogHandler):
 
     def get(self, post_id):
         query = \
-            'select * from Comment where post_id={} order by created desc limit 10'.format(int(post_id))
+            'select * from Comment where post_id={} order by created'\
+            'desc limit 10'.format(int(post_id))
 
         pkey = db.Key.from_path('Post', int(post_id), parent=blog_key())
         post = db.get(pkey)
         comments = db.GqlQuery(query)
 
         if not post:
-            self.error(404)
+            self.redirect("/404")
             return
         else:
             post.link = '/blog/{}'.format(post_id)
@@ -303,15 +303,16 @@ class PostPage(BlogHandler):
 
     def post(self, post_id):
         query = \
-            'select * from Comment where post_id={} order by created desc limit 10'.format(int(post_id))
+            'select * from Comment where post_id={} order by created'\
+            'desc limit 10'.format(int(post_id))
 
         content = str(self.request.get('comText'))
-        user = self.get_user().name
+        name = self.get_user().name
         error = ''
         pkey = db.Key.from_path('Post', int(post_id), parent=blog_key())
 
-        if content and user:
-            c = Comment(parent=blog_key(), user=user, content=content,
+        if content and name:
+            c = Comment(parent=blog_key(), user=name, content=content,
                         post_id=int(post_id))
             c.put()
 
@@ -335,15 +336,17 @@ class NewPost(BlogHandler):
     def post(self):
         subject = self.request.get('subject')
         content = self.request.get('content').replace('\n', '<br>')
-        user = self.get_user().name
+        user = self.get_user()
 
-        if subject and content:
-            p = Post(parent=blog_key(), user=user, subject=subject,
+        if subject and content and user:
+            p = Post(parent=blog_key(), user=user.name, subject=subject,
                      content=content)
             p.put()
             link = '/blog/{}'.format(p.key().id())
 
             self.redirect(link)
+        elif user is None:
+            self.redirect('/login')
         else:
             error = 'Subject and content, please!'
             self.render('newpost.html', subject=subject,
@@ -374,7 +377,8 @@ class SignUp(BlogHandler):
                                 emailf=email, errorf=error)
                 elif len(password) < 8:
                     error = \
-                        'Password not secure enough; please makeit AT LEAST 8 characters!'
+                        'Password not secure enough; please make'\
+                        'it AT LEAST 8 characters!'
                     self.render('signup.html', userf=user,
                                 emailf=email, errorf=error)
                 else:
@@ -442,16 +446,29 @@ class Success(BlogHandler):
                     message=messages[message])
 
 
+class NotFound(BlogHandler):
+
+    def get(self):
+        self.render('404.html')
+        return
+
 # -----
 # --Comment Action Handlers
 # -----
 
-class EditCom(BlogHandler):
+
+class EditComment(BlogHandler):
 
     def get(self, com_id):
         ckey = db.Key.from_path('Comment', int(com_id),
                                 parent=blog_key())
         comment = db.get(ckey)
+
+        # Check if comment exists then redirect if not
+        if not comment:
+            self.redirect('/404')
+            return
+
         link = '/blog/' + str(comment.post_id)
         content = comment.content
         self.render('editcom.html', comment=content, link=link)
@@ -460,29 +477,48 @@ class EditCom(BlogHandler):
         ckey = db.Key.from_path('Comment', int(com_id),
                                 parent=blog_key())
         comment = db.get(ckey)
+
+        # Check if comment exists then redirect if not
+        if not comment:
+            self.redirect('/404')
+            return
+
         comment.content = self.request.get('comText')
         link = '/blog/' + str(comment.post_id)
 
         try:
-            user = User.by_id(self.read_cookie('user-id')).name
-            if user == comment.user:
+            user = User.by_id(self.read_cookie('user-id'))
+
+            # Check if user exists and redirect if not
+            if user is None:
+                self.redirect('/404')
+                return
+
+            if user.name == comment.user:
                 comment.put()
                 self.redirect(link)
             else:
                 error = \
-                    "Sorry you aren't the original commenter!Stop trying to hack people bro!"
+                    "Sorry you aren't the original commenter! "\
+                    "Stop trying to hack people bro!"
                 self.render('editcom.html', comment=comment,
                             error=error)
         except:
             self.redirect(link)
 
 
-class DeleteCom(BlogHandler):
+class DeleteComment(BlogHandler):
 
     def get(self, com_id):
         ckey = db.Key.from_path('Comment', int(com_id),
                                 parent=blog_key())
         comment = db.get(ckey)
+
+        # Check if comment exists then redirect if not
+        if not comment:
+            self.redirect('/404')
+            return
+
         self.render('verify.html', comment=comment)
 
     def post(self, com_id):
@@ -490,11 +526,23 @@ class DeleteCom(BlogHandler):
         ckey = db.Key.from_path('Comment', int(com_id),
                                 parent=blog_key())
         comment = db.get(ckey)
+
+        # Check if comment exists then redirect if not
+        if not comment:
+            self.redirect('/404')
+            return
+
         link = '/blog/' + str(comment.post_id)
 
         try:
-            user = User.by_id(self.read_cookie('user-id')).name
-            if user == comment.user:
+            user = User.by_id(self.read_cookie('user-id'))
+
+            # Check if user exists and redirect if not
+            if user is None:
+                self.redirect('/404')
+                return
+
+            if user.name == comment.user:
                 comment.delete()
                 self.redirect(link)
             else:
@@ -512,6 +560,12 @@ class EditPost(BlogHandler):
     def get(self, post_id):
         pkey = db.Key.from_path('Post', int(post_id), parent=blog_key())
         post = db.get(pkey)
+
+        # Check if post exists and redirect if not
+        if post is None:
+            self.redirect('/404')
+            return
+
         link = '/blog/' + post_id
         content = post.content
         self.render('editpost.html', content=content, link=link)
@@ -519,18 +573,31 @@ class EditPost(BlogHandler):
     def post(self, post_id):
         pkey = db.Key.from_path('Post', int(post_id), parent=blog_key())
         post = db.get(pkey)
+
+        # Check if post exists and redirect if not
+        if post is None:
+            self.redirect('/404')
+            return
+
         post.content = self.request.get('postText')
         post.content = post.content.replace('\n', '<br>')
         link = '/blog/' + post_id
 
         try:
-            user = User.by_id(self.read_cookie('user-id')).name
-            if user == post.user:
+            user = User.by_id(self.read_cookie('user-id'))
+
+            # Check if user exists and redirect if not
+            if user is None:
+                self.redirect('/404')
+                return
+
+            if user.name == post.user:
                 post.put()
                 self.redirect(link)
             else:
                 error = \
-                    "Sorry you aren't the original poster!Stop trying to hack people bro!"
+                    "Sorry you aren't the original poster! "\
+                    "Stop trying to hack people bro!"
                 self.render('editpost.html', content=content,
                             error=error)
         except:
@@ -542,17 +609,35 @@ class DeletePost(BlogHandler):
     def get(self, post_id):
         pkey = db.Key.from_path('Post', int(post_id), parent=blog_key())
         post = db.get(pkey)
+
+        # Check if post exists and redirect if not
+        if post is None:
+            self.redirect('/404')
+            return
+
         self.render('deletepost.html', post=post)
 
     def post(self, post_id):
         response = self.request.get('response')
         pkey = db.Key.from_path('Post', int(post_id), parent=blog_key())
         post = db.get(pkey)
+
+        # Check if post exists and redirect if not
+        if post is None:
+            self.redirect('/404')
+            return
+
         link = '/blog'
 
         try:
-            user = User.by_id(self.read_cookie('user-id')).name
-            if user == post.user:
+            user = User.by_id(self.read_cookie('user-id'))
+
+            # Check if user exists and redirect if not
+            if user is None:
+                self.redirect('/404')
+                return
+
+            if user.name == post.user:
                 post.delete()
                 self.redirect(link)
             else:
@@ -569,6 +654,12 @@ class LikePost(BlogHandler):
         user = self.get_user()
         liked = user.liked_posts
         link = '/blog/' + post_id
+
+        if user.name == post.user:
+            self.render("whoops.html")
+            return
+
+        # Checks whether or not user has already liked post
         if not int(post_id) in liked:
             user.liked_posts.append(int(post_id))
             post.likes += 1
@@ -594,9 +685,10 @@ app = webapp2.WSGIApplication([
     ('/blog/newpost', NewPost),
     ('/blog/([0-9]+)', PostPage),
     ('/blog/([0-9]+)/edit', PostPage),
-    ('/comment/edit/([0-9]+)', EditCom),
-    ('/comment/delete/([0-9]+)', DeleteCom),
+    ('/comment/edit/([0-9]+)', EditComment),
+    ('/comment/delete/([0-9]+)', DeleteComment),
     ('/blog/edit/([0-9]+)', EditPost),
     ('/blog/delete/([0-9]+)', DeletePost),
     ('/blog/like/([0-9]+)', LikePost),
+    ('/404', NotFound)
     ], debug=True)
