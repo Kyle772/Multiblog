@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h3 class="title">Blog Posts</h3>
+    {% for p in posts %}
+        {{ p.render(user=user) | safe }}
+        <br><br>
+    {% endfor %}
+
+{% endblock %}

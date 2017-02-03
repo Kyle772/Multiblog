@@ -1,0 +1,8 @@
+<div class="comment">
+    {% if user == comment.user %}
+        <a href="/comment/delete/{{comment.key().id()}}" class="editBut">Delete</a>    
+        <a class="editBut" href="/comment/edit/{{comment.key().id()}}">Edit</a>
+    {% endif %}
+    <h4>{{ comment.user }} - {{ comment.created.strftime("%b %d, %Y") }}</h4>
+    <p>{{ comment.content }}</p>
+</div>

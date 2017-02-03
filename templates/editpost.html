@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h3 class="title">Edit Post</h3>
+    <form method="post">
+        <div>Post:</div>
+        <textarea class="multiline" type="text" name="postText">{{ content.replace("<br>", "\n") }}</textarea>
+        <a href="{{link}}" class="button">Cancel</a>
+        <input class="button" type="submit" value="Save Edit">
+        <p>{{error}}</p>
+    </form>
+{% endblock %}

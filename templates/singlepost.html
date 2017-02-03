@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h3 class="title">
+    {{ post.subject }}
+</h3>
+<div class="post">
+    <h4 class="postDate">
+        {{ post.user }} - {{ post.created.strftime("%b %d, %Y") }} - {{ post.likes }} Likes
+    </h4>
+    <p class="content">
+        {{ post.content | safe }}
+    </p>
+    <div class="postButCon">
+        {% if user and user != post.user%}
+            <a href="/blog/like/{{post.key().id()}}" class="button">
+                Like/Dislike
+            </a>    
+        {% endif %}
+        {% if user == post.user %}
+            <a href="/blog/delete/{{post.key().id()}}" class="button">
+                Delete
+            </a>    
+            <a class="button" href="/blog/edit/{{post.key().id()}}">
+                Edit
+            </a>
+        {% endif %}
+        <a class="button" href="/blog/{{ post.key().id() }}#Comments">
+            View comments
+        </a>
+    </div>
+</div>
+<br><br>
+<h3 class="title">Comments</h3>
+    {%- if user -%}
+        <form name="comForm" method="post">
+            <textarea class="multiline short" name="comText"></textarea>
+            <input type="submit" value="Post Comment">
+        </form>
+        <br>
+    {% endif %}
+    {%- if comments -%}
+        {% for c in comments %}
+            {{ c.render(user) | safe }}
+            <br>
+        {% endfor %}
+    {% endif %}
+{% endblock %}

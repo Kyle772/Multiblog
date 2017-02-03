@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <form method="post">
+        <h3 class="title">Log in!</h3>
+        <div id="LogForm">
+            <label>Username:</label>
+            <input name="userf" type="text" value={{userf}}><br>
+            <label>Password:</label>
+            <input name="passwordf" type="password"><br>
+            <input type="submit">
+            <p>{{errorf}}</p>
+        </div>
+    </form>
+{% endblock %}

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="stylesheet" href="/static/blog.css">
+        <title>Kyle's blog site</title>
+    </head>
+    <body>
+        <div class="header constrain">
+            <div class="highlight fw">
+                Kyle's Blog Site!
+            </div>
+            <div class="nav">
+                <a href="/blog">Blog</a>
+                {%- if user -%}
+                <a href="/blog/newpost">New Post</a>
+                <a href="/logout">Log out</a>
+                {% else %}
+                <a href="/signup">Sign Up</a>
+                <a href="/login">Log In</a>
+                {% endif %}
+                
+            </div>
+        </div>
+        
+        <div class="blog">
+            {%- if user -%}
+                <p class="sia">Signed in as {{ user }}</p>
+            {% endif %}
+            {% block content %}
+            {% endblock %}
+        </div>
+    </body>
+</html>
